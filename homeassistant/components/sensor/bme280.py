@@ -58,7 +58,7 @@ SENSOR_PRESS = 'pressure'
 SENSOR_TYPES = {
     SENSOR_TEMP: ['Temperature', None],
     SENSOR_HUMID: ['Humidity', '%'],
-    SENSOR_PRESS: ['Pressure', 'mb']
+    SENSOR_PRESS: ['Pressure', 'hPa']
 }
 DEFAULT_MONITORED = [SENSOR_TEMP, SENSOR_HUMID, SENSOR_PRESS]
 
@@ -90,7 +90,6 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
                  default=DEFAULT_DELTA_TEMP): vol.Coerce(float),
 })
 
-
 async def async_setup_platform(hass, config, async_add_entities,
                                discovery_info=None):
     """Set up the BME280 sensor."""
@@ -100,6 +99,10 @@ async def async_setup_platform(hass, config, async_add_entities,
     SENSOR_TYPES[SENSOR_TEMP][1] = hass.config.units.temperature_unit
     name = config.get(CONF_NAME)
     i2c_address = config.get(CONF_I2C_ADDRESS)
+
+    res_temp = config.get(CONF_RESOLUTION_TEMP)
+    res_pres = config.get(CONF_RESOLUTION_PRES)
+    res_hum = config.get(CONF_RESOLUTION_HUM)
 
     bus = smbus.SMBus(config.get(CONF_I2C_BUS))
     sensor = await hass.async_add_job(
@@ -123,7 +126,7 @@ async def async_setup_platform(hass, config, async_add_entities,
     try:
         for variable in config[CONF_MONITORED_CONDITIONS]:
             dev.append(BME280Sensor(
-                sensor_handler, variable, SENSOR_TYPES[variable][1], name))
+                sensor_handler, variable, SENSOR_TYPES[variable][1], name, res_temp, res_pres, res_hum))
     except KeyError:
         pass
 
@@ -147,7 +150,7 @@ class BME280Handler:
 class BME280Sensor(Entity):
     """Implementation of the BME280 sensor."""
 
-    def __init__(self, bme280_client, sensor_type, temp_unit, name):
+    def __init__(self, bme280_client, sensor_type, temp_unit, name, res_temp, res_pres, res_hum):
         """Initialize the sensor."""
         self.client_name = name
         self._name = SENSOR_TYPES[sensor_type][0]
@@ -156,6 +159,10 @@ class BME280Sensor(Entity):
         self.type = sensor_type
         self._state = None
         self._unit_of_measurement = SENSOR_TYPES[sensor_type][1]
+        self._res_temp = res_temp
+        self._res_pres = res_pres
+        self._res_hum = res_hum
+        # self._resolution = 3
 
     @property
     def name(self):
@@ -177,13 +184,13 @@ class BME280Sensor(Entity):
         await self.hass.async_add_job(self.bme280_client.update)
         if self.bme280_client.sensor.sample_ok:
             if self.type == SENSOR_TEMP:
-                temperature = round(self.bme280_client.sensor.temperature, CONF_RESOLUTION_TEMP)
+                temperature = round(self.bme280_client.sensor.temperature, self._res_temp)
                 if self.temp_unit == TEMP_FAHRENHEIT:
-                    temperature = round(celsius_to_fahrenheit(temperature), CONF_RESOLUTION_TEMP)
+                    temperature = round(celsius_to_fahrenheit(temperature), self._res_temp)
                 self._state = temperature
             elif self.type == SENSOR_HUMID:
-                self._state = round(self.bme280_client.sensor.humidity, CONF_RESOLUTION_HUM)
+                self._state = round(self.bme280_client.sensor.humidity, self._res_hum)
             elif self.type == SENSOR_PRESS:
-                self._state = round(self.bme280_client.sensor.pressure, CONF_RESOLUTION_PRES)
+                self._state = round(self.bme280_client.sensor.pressure, self._res_pres)
         else:
             _LOGGER.warning("Bad update of sensor.%s", self.name)
