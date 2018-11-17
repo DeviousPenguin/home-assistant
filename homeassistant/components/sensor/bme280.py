@@ -25,6 +25,9 @@ _LOGGER = logging.getLogger(__name__)
 
 CONF_I2C_ADDRESS = 'i2c_address'
 CONF_I2C_BUS = 'i2c_bus'
+CONF_RESOLUTION_TEMP = 'resolution_temperature'
+CONF_RESOLUTION_PRES = 'resolution_pressure'
+CONF_RESOLUTION_HUM = 'resolution_humidity'
 CONF_OVERSAMPLING_TEMP = 'oversampling_temperature'
 CONF_OVERSAMPLING_PRES = 'oversampling_pressure'
 CONF_OVERSAMPLING_HUM = 'oversampling_humidity'
@@ -36,6 +39,9 @@ CONF_DELTA_TEMP = 'delta_temperature'
 DEFAULT_NAME = 'BME280 Sensor'
 DEFAULT_I2C_ADDRESS = '0x76'
 DEFAULT_I2C_BUS = 1
+DEFAULT_RESOLUTION_TEMP = 1  # Temperature resolution x 1
+DEFAULT_RESOLUTION_PRES = 1  # Pressure resolution x 1
+DEFAULT_RESOLUTION_HUM = 1  # Humidity resolution x 1
 DEFAULT_OVERSAMPLING_TEMP = 1  # Temperature oversampling x 1
 DEFAULT_OVERSAMPLING_PRES = 1  # Pressure oversampling x 1
 DEFAULT_OVERSAMPLING_HUM = 1  # Humidity oversampling x 1
@@ -62,6 +68,12 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Optional(CONF_MONITORED_CONDITIONS, default=DEFAULT_MONITORED):
         vol.All(cv.ensure_list, [vol.In(SENSOR_TYPES)]),
     vol.Optional(CONF_I2C_BUS, default=DEFAULT_I2C_BUS): vol.Coerce(int),
+    vol.Optional(CONF_RESOLUTION_TEMP,
+                 default=DEFAULT_RESOLUTION_TEMP): vol.Coerce(int),
+    vol.Optional(CONF_RESOLUTION_PRES,
+                 default=DEFAULT_RESOLUTION_PRES): vol.Coerce(int),
+    vol.Optional(CONF_RESOLUTION_HUM,
+                 default=DEFAULT_RESOLUTION_HUM): vol.Coerce(int),
     vol.Optional(CONF_OVERSAMPLING_TEMP,
                  default=DEFAULT_OVERSAMPLING_TEMP): vol.Coerce(int),
     vol.Optional(CONF_OVERSAMPLING_PRES,
@@ -165,13 +177,13 @@ class BME280Sensor(Entity):
         await self.hass.async_add_job(self.bme280_client.update)
         if self.bme280_client.sensor.sample_ok:
             if self.type == SENSOR_TEMP:
-                temperature = round(self.bme280_client.sensor.temperature, 1)
+                temperature = round(self.bme280_client.sensor.temperature, CONF_RESOLUTION_TEMP)
                 if self.temp_unit == TEMP_FAHRENHEIT:
-                    temperature = round(celsius_to_fahrenheit(temperature), 1)
+                    temperature = round(celsius_to_fahrenheit(temperature), CONF_RESOLUTION_TEMP)
                 self._state = temperature
             elif self.type == SENSOR_HUMID:
-                self._state = round(self.bme280_client.sensor.humidity, 1)
+                self._state = round(self.bme280_client.sensor.humidity, CONF_RESOLUTION_HUM)
             elif self.type == SENSOR_PRESS:
-                self._state = round(self.bme280_client.sensor.pressure, 1)
+                self._state = round(self.bme280_client.sensor.pressure, CONF_RESOLUTION_PRES)
         else:
             _LOGGER.warning("Bad update of sensor.%s", self.name)
